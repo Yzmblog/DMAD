@@ -188,23 +188,6 @@ result = pipe(prompt=prompt, height=768, width=1344, num_frames=124,
 The pipeline steps with the Euler rule, so its videos differ from `inference.py`'s (whose re-noise rule is what the
 students were trained with and what the paper reports). In our evaluation the re-noise rule scores higher.
 
-### Hardware
-
-Measured on one NVIDIA H200 at 1344x768, 124 frames, 4 steps, in the environment above (wall-clock, including the
-one-off model loading of about 4 minutes per run: text encoder, transformer, VAEs):
-
-| | sampling, per video | decoding, per video | peak GPU memory | host memory |
-|---|---|---|---|---|
-| `inference.py` | ~70 s | ~65 s | 71.7 GiB | ~70 GB |
-| `inference.py --offload` | ~70 s | ~65 s | 62.2 GiB | ~70 GB |
-| `run_diffusers_pipeline.py` | ~3 min per video, all stages (components move between CPU and GPU for every prompt) | | 72.5 GiB on an 80 GB GPU | ~70 GB |
-
-The text encoder (Qwen3-VL-32B, 64 GB in bf16) runs first and is released before the transformer (66 GB in bf16) is
-loaded, so the default path fits an 80 GB GPU (we checked it under an 80 GiB allocator cap). `--offload` keeps the
-transformer in host memory and streams it to the GPU one block at a time; its output is identical to the default
-path, and the peak then comes from the text encoder. The Diffusers pipeline keeps every component resident when the
-GPU has room (134 GiB on the H200) and offloads idle ones on an 80 GB GPU; its videos match `inference.py --euler`
-to within numerical precision (PSNR > 40 dB).
 
 
 ## 📚 Citation
