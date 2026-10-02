@@ -1,0 +1,11 @@
+# Python 3.12, CUDA 12.6. Install torch first:
+#   pip install torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0 --index-url https://download.pytorch.org/whl/cu126
+# The MiniMax-H3 classes are only in Diffusers main; this is the commit all our results were produced with.
+diffusers @ git+https://github.com/huggingface/diffusers.git@35ab485bdea676dbcbc77de60d77f7acb4f390fd
+transformers==5.12.1
+peft==0.20.0
+accelerate==1.14.0
+huggingface_hub==1.27.0
+safetensors==0.8.0
+numpy
+imageio-ffmpeg==0.6.0

@@ -1,0 +1,15 @@
+DMAD inference code for MiniMax-H3
+Copyright 2026 the DMAD authors. Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The DMAD student checkpoints distributed with this code are Model Derivatives of MiniMax H3 and are
+licensed under the MiniMax H3 Community License Agreement, not under Apache 2.0:
+
+    "MiniMax H3 is licensed under the MiniMax H3 Community License Agreement,
+     Copyright (c) 2026 MiniMax. All Rights Reserved."
+
+A copy of that agreement, including its territorial restrictions and Acceptable Use Policy, accompanies the
+checkpoints (https://huggingface.co/MiniMaxAI/MiniMax-H3/blob/main/LICENSE). Videos produced with these
+models are AI-generated.
+
+Portions of dmad_h3/ (the packed-sequence geometry and the sampling / decoding helpers) were written for the
+LightX2V-Train based training code of DMAD and are included here in modified form.
