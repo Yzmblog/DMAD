@@ -54,11 +54,16 @@ def load_transformer(path, dtype=torch.bfloat16):
     return transformer
 
 
-def load_vaes(model_dir, device):
-    """The video and audio VAEs in float32 on `device`."""
+def load_vaes(model_dir, device, decoder_only=False, dtype=torch.float32):
+    """The video and audio VAEs on `device`. `dtype` is the video VAE's precision (float32 as released, the precision
+    of every result; bfloat16 decodes about twice as fast at ~42 dB PSNR to the float32 decode); the small audio VAE
+    always stays float32. `decoder_only` drops the video encoder (0.7 GB), which text-to-video never calls."""
     from diffusers import AutoencoderKLMiniMaxH3, AutoencoderKLMiniMaxH3Audio
 
     root = Path(model_dir).expanduser().resolve()
-    vae = AutoencoderKLMiniMaxH3.from_pretrained(str(root / "vae"), local_files_only=True).eval().to(device)
+    vae = AutoencoderKLMiniMaxH3.from_pretrained(str(root / "vae"), local_files_only=True).eval()
+    if decoder_only:
+        vae.encoder = None
+    vae.to(device=device, dtype=dtype)
     audio_vae = AutoencoderKLMiniMaxH3Audio.from_pretrained(str(root / "audio_vae"), local_files_only=True).eval().to(device)
     return vae, audio_vae

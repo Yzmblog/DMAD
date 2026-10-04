@@ -101,7 +101,7 @@ def rollout(transformer, prompt_embeds, layout, shape, geometry, video_sigmas, a
 @torch.no_grad()
 def decode_rows(vae, audio_vae, video_rows, audio_rows, shape, geometry):
     """Packed latent rows -> (uint8 frames [T, H, W, 3], float32 waveform [N, 2])."""
-    device = next(vae.parameters()).device
+    device, vae_dtype = next(vae.parameters()).device, next(vae.parameters()).dtype
     vm = torch.tensor(vae.config.latents_mean, device=device).view(1, -1, 1, 1, 1)
     vs = torch.tensor(vae.config.latents_std, device=device).view(1, -1, 1, 1, 1)
     am = torch.tensor(audio_vae.config.latents_mean, device=device).view(1, -1, 1)
@@ -112,12 +112,13 @@ def decode_rows(vae, audio_vae, video_rows, audio_rows, shape, geometry):
     hh, ww = shape["latent_height"] // ph, shape["latent_width"] // pw
     z = video_rows.float().to(device).reshape(t, hh, ww, video_channels, ph, pw)
     z = z.permute(3, 0, 1, 4, 2, 5).reshape(1, video_channels, t, hh * ph, ww * pw)
-    px = vae.decode(z * vs + vm).sample
+    px = vae.decode((z * vs + vm).to(vae_dtype)).sample
     pm = torch.tensor(PIXEL_MEAN, device=px.device).view(3, 1, 1, 1)
     ps = torch.tensor(PIXEL_STD, device=px.device).view(3, 1, 1, 1)
     frames = ((px[0].float() * ps + pm).clamp(0, 1) * 255.0).round().byte().cpu().numpy().transpose(1, 2, 3, 0)
     za = audio_rows.float().to(device).reshape(1, 2, -1, audio_channels)
     za = za[0].permute(0, 2, 1) * as_ + am
+    za = za.to(next(audio_vae.parameters()).dtype)
     wav = audio_vae.decode(za).sample[:, 0].float().clamp(-1, 1).cpu().numpy().T.astype(np.float32)
     return frames, wav
 

@@ -38,14 +38,20 @@ def load_conditioner(model_dir, device, dtype=torch.bfloat16):
     return text_encoder, tokenizer, processor
 
 
-@torch.inference_mode()
-def encode_prompt(text_encoder, tokenizer, processor, prompt, device, output_dtype=torch.bfloat16):
-    """-> {"prompt_embeds": [1, tokens, 5120] on CPU, "text_token_tags": [tokens] long}."""
+def prompt_inputs(tokenizer, processor, prompt, device):
+    """-> (input_ids [1, tokens], mm_token_type_ids [1, tokens]) of the prompt taken verbatim."""
     token_ids = tokenizer(prompt, add_special_tokens=False)["input_ids"]
     if not token_ids:
         raise ValueError("The tokenizer produced no tokens for a non-empty prompt.")
     input_ids = torch.tensor([token_ids], dtype=torch.long, device=device)
     mm_token_type_ids = torch.tensor(processor.create_mm_token_type_ids([token_ids]), dtype=torch.long, device=device)
+    return input_ids, mm_token_type_ids
+
+
+@torch.inference_mode()
+def encode_prompt(text_encoder, tokenizer, processor, prompt, device, output_dtype=torch.bfloat16):
+    """-> {"prompt_embeds": [1, tokens, 5120] on CPU, "text_token_tags": [tokens] long}."""
+    input_ids, mm_token_type_ids = prompt_inputs(tokenizer, processor, prompt, device)
     outputs = text_encoder.model(
         input_ids=input_ids,
         attention_mask=torch.ones_like(input_ids),
@@ -56,5 +62,5 @@ def encode_prompt(text_encoder, tokenizer, processor, prompt, device, output_dty
         output_hidden_states=True,
     )
     prompt_embeds = outputs.hidden_states[TEXT_ENCODER_LAYER].to(dtype=output_dtype).cpu()
-    text_token_tags = torch.full((len(token_ids),), TEXT_TAG, dtype=torch.long)
+    text_token_tags = torch.full((input_ids.shape[1],), TEXT_TAG, dtype=torch.long)
     return {"prompt_embeds": prompt_embeds, "text_token_tags": text_token_tags}
