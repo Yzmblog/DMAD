@@ -139,7 +139,7 @@ transformer stage.
 
 | Option | Default | Notes |
 |--------|---------|-------|
-| `--steps` | 4 | model evaluations; the students were trained for 4 |
+| `--steps` | 4 | model evaluations; 4 is the trained setting, other counts work (see **Steps** below) |
 | `--video-shift`, `--audio-shift` | 12, 2 | time shifts of the sigma grid |
 | `--seed` | 42 | one CPU generator draws the video noise, then the audio noise, then the re-noise draws |
 | `--euler` | off | Euler step rule (the official H3 pipeline's) instead of the re-noise rule; the paper's videos use the re-noise rule |
@@ -155,6 +155,11 @@ transformer stage.
 **Prompts.** MiniMax-H3 was trained on long, structured descriptions (an `integrated_multimodal_description:` shot
 list, `overall_soundscape:`, `non_diegetic_music:`); detailed prompts like `prompts/dmad_sweater.txt` work best, short
 ones work too. The prompt is encoded verbatim, with no template, as in the official pipeline.
+
+**Steps.** The students are trained in continuous time (the re-noise rule at random noise levels), not for one
+fixed schedule, so `--steps` is free: the sampler walks the same shifted-linear sigma grid with as many evaluations as
+you ask for, and the sampling time scales linearly (9 s per evaluation on an H200 at the default size). On prompts
+with fast motion (martial arts, boxing, a dunk) we see 8 and 12 steps render the fast movements cleaner than 4-step.
 
 ### On consumer GPUs
 
