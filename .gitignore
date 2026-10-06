@@ -5,3 +5,7 @@ outputs/
 ckpt/
 models/
 *.safetensors
+*.egg-info/
+wandb/
+checkpoints/
+!train/wan/rcm/models/

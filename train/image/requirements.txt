@@ -1,0 +1,24 @@
+torch==2.1.2
+torchvision==0.16.2
+accelerate==0.23.0
+diffusers==0.28.2
+transformers==4.40.2
+huggingface-hub==0.24.6
+peft==0.13.2
+safetensors==0.5.3
+numpy==1.24.4
+scipy==1.10.1
+lmdb==1.4.1
+wandb==0.24.2
+matplotlib==3.7.5
+imageio==2.35.1
+click==8.1.8
+requests==2.32.4
+timm==0.6.13
+pillow==10.4.0
+# SDXL evaluation
+clean-fid==0.1.35
+open-clip-torch==2.32.0
+git+https://github.com/openai/CLIP.git
+image-reward==1.5
+ftfy==6.2.3

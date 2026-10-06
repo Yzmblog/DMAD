@@ -51,6 +51,9 @@ This repository contains:
   (the sampler of all results in the paper), on one 80 GB GPU or, with `--low-vram`, on a 24 GB consumer GPU
 * 🧩 [`run_diffusers_pipeline.py`](run_diffusers_pipeline.py): the students inside the official Diffusers
   `MiniMaxH3ModularPipeline`
+* 🏋️ [`train/`](train/): the DMAD training code for ImageNet-64 and SDXL ([`train/image`](train/image/)), Wan2.1
+  ([`train/wan`](train/wan/)) and MiniMax-H3 ([`train/h3`](train/h3/)), each with its own README, environment and
+  evaluation
 
 
 ## 🛠️ Setup
@@ -228,6 +231,17 @@ students were trained with and what the paper reports). In our evaluation the re
 
 
 
+## 🏋️ Training
+
+The DMAD training code is under [`train/`](train/), one folder per model family. Each is a fork of the codebase it
+started from and has its own README with the environment, data preparation, training and evaluation instructions:
+
+| Folder | Models | Base code | License |
+|---|---|---|---|
+| [`train/image`](train/image/) | ImageNet-64 (EDM teacher), 1 step; SDXL, 4 and 1 steps | [DMD2](https://github.com/tianweiy/DMD2) | CC BY-NC-SA 4.0 |
+| [`train/wan`](train/wan/) | Wan2.1-T2V 1.3B and 14B, 4 steps | [rCM](https://github.com/NVlabs/rcm) | Apache 2.0 |
+| [`train/h3`](train/h3/) | MiniMax-H3 text-to-audio-video, 4 steps (the students above) | [LightX2V](https://github.com/ModelTC/LightX2V) | Apache 2.0 |
+
 ## 📚 Citation
 
 ```bibtex
@@ -245,13 +259,20 @@ students were trained with and what the paper reports). In our evaluation the re
 ## 🙏 Acknowledgements
 
 * **[MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3)**, the teacher and base model of the students.
-* **[LightX2V](https://github.com/ModelTC/LightX2V)**, whose training framework our DMAD training code builds on.
+* **[LightX2V](https://github.com/ModelTC/LightX2V)**, whose training framework our MiniMax-H3 training code
+  (`train/h3`) builds on.
+* **[DMD2](https://github.com/tianweiy/DMD2)**, the codebase our ImageNet-64 and SDXL training code (`train/image`)
+  builds on.
 * **[Diffusers](https://github.com/huggingface/diffusers)**, whose MiniMax-H3 implementation runs the transformer,
   the VAEs and the official pipeline.
+* **[rCM](https://github.com/NVlabs/rcm)**, whose codebase our Wan2.1 training code (`train/wan`) builds on.
 
 Thanks to their authors for the open-source contributions.
 
 
 ## 📄 License
 
-The code in this repository is released under the [Apache License 2.0](LICENSE).
+The code at the root of this repository and in [`train/wan`](train/wan/) and [`train/h3`](train/h3/) is released under
+the [Apache License 2.0](LICENSE) (see also [`train/wan/LICENSE.txt`](train/wan/LICENSE.txt) and
+[`train/h3/LICENSE`](train/h3/LICENSE)); [`train/image`](train/image/) inherits DMD2's
+[CC BY-NC-SA 4.0](train/image/LICENSE.md).
