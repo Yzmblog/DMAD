@@ -103,7 +103,7 @@ python main/edm/test_folder_edm.py --folder ckpt/imagenet64/dmad_imagenet_gaprou
 | 1-step, ODE init, frozen critic backbone | [dmad_sdxl_1step_frozencritic.sh](experiments/sdxl/dmad_sdxl_1step_frozencritic.sh) | 1 | 16.11 | 32.42 | 0.338 | 17.5k | [link](https://huggingface.co/ZhengmingYu/DMAD/blob/main/sdxl/dmad_sdxl_1step_frozencritic_unet_fp16.bin) |
 
 COCO-2014 10k prompts, EMA generator; FID and patch FID against the COCO-10k reference images, CLIP score with
-ViT-g/14. [eval_sdxl.py](main/sdxl/eval_sdxl.py) also reports PickScore, HPSv2/v2.1 and ImageReward.
+ViT-g/14.
 
 ### Inference
 
@@ -147,13 +147,9 @@ bash experiments/sdxl/dmad_sdxl_4step.sh
 bash experiments/sdxl/dmad_sdxl_1step_frozencritic.sh
 bash experiments/sdxl/dmad_sdxl_1step.sh
 
-# evaluate one checkpoint on one GPU (set METRIC_PATH to also compute PickScore / HPSv2 / ImageReward)
+# evaluate one checkpoint on one GPU (FID, patch FID, CLIP score)
 bash experiments/sdxl/eval_sdxl.sh <checkpoint folder>/pytorch_model_ema.bin 4step result.json
 ```
-
-`METRIC_PATH` holds `PickScore_v1/` (yuvalkirstain/PickScore_v1), `CLIP-ViT-H-14-laion2B-s32B-b79K/`
-(its processor files), `HPS_v2_compressed.pt`, `HPS_v2.1_compressed.pt` (xswu/HPSv2), and `ImageReward.pt` with
-`med_config.json` (THUDM/ImageReward).
 
 ## License
 

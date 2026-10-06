@@ -10,7 +10,7 @@ gives bit-identical videos, so these nodes are a convenience; either works.
   (euler, ...) step from x_t instead, which is not the students' operating point.
 * **DMAD Sigmas** — the students' sigma grid: shifted linear from 1 to 0, shift 12 (video), `steps` model evaluations.
 
-The ComfyUI-layout LoRAs, [`comfyui/dmad_minimax_h3_4step_{lora_critic,full_critic}_comfyui.safetensors`](https://huggingface.co/ZhengmingYu/DMAD/tree/main/comfyui)
+The ComfyUI-layout LoRAs, [`minimax_h3/dmad_minimax_h3_4step_{lora_critic,full_critic}_comfyui.safetensors`](https://huggingface.co/ZhengmingYu/DMAD/tree/main/minimax_h3)
 on the Hugging Face repo, are exact conversions of the released LoRAs (rank 128; q/k/v fused block-diagonally into
 `qkv_proj`, SwiGLU halves reordered; no merging or rank reduction), made with
 [`tools/convert_lora_comfyui.py`](../../tools/convert_lora_comfyui.py).
@@ -21,7 +21,7 @@ Copy or symlink this folder into `ComfyUI/custom_nodes/`:
 
 ```bash
 cp -r comfyui/ComfyUI-DMAD /path/to/ComfyUI/custom_nodes/
-hf download ZhengmingYu/DMAD --include "comfyui/*" --local-dir /path/to/ComfyUI/models/loras   # -> models/loras/comfyui/*.safetensors
+hf download ZhengmingYu/DMAD --include "minimax_h3/*_comfyui.safetensors" --local-dir /path/to/ComfyUI/models/loras   # -> models/loras/minimax_h3/
 ```
 
 The base model, text encoder and VAEs are the

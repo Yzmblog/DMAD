@@ -99,21 +99,22 @@ models/MiniMax-H3/
 
 ```bash
 mkdir -p ckpt
-hf download ZhengmingYu/DMAD --include "minimax_h3/*" --local-dir ckpt
+hf download ZhengmingYu/DMAD --include "minimax_h3/*_critic.safetensors" --local-dir ckpt
 ```
 
 | File | Checkpoint | Size |
 |------|------------|------|
 | `minimax_h3/dmad_minimax_h3_4step_lora_critic.safetensors` | the checkpoint of the paper: EMA of the student at iteration 800 of the main run | 1.4 GB |
 | `minimax_h3/dmad_minimax_h3_4step_full_critic.safetensors` | the student of a run whose critic backbone is fully trained (the paper's run keeps it frozen under a LoRA): iteration 1600, live weights; it scores higher on AVGen-Bench | 1.4 GB |
+| `minimax_h3/dmad_minimax_h3_4step_lora_critic_comfyui.safetensors` | `lora_critic` in ComfyUI's MiniMax-H3 key layout (exact conversion) | 2.0 GB |
+| `minimax_h3/dmad_minimax_h3_4step_full_critic_comfyui.safetensors` | `full_critic` in ComfyUI's MiniMax-H3 key layout (exact conversion) | 2.0 GB |
 
-Both are rank-128 LoRAs (alpha 128) on the attention projections and the two feed-forward layers of all 50
+The first two are rank-128 LoRAs (alpha 128) on the attention projections and the two feed-forward layers of all 50
 transformer blocks and the 2 token-refiner blocks, in the Diffusers key layout (`<module>.lora.down.weight`,
 `<module>.lora.up.weight`). The safetensors metadata records the rank, alpha and fusion rule.
 
-For ComfyUI, [`comfyui/`](https://huggingface.co/ZhengmingYu/DMAD/tree/main/comfyui) on the Hugging Face repo holds the same two LoRAs
-converted exactly to ComfyUI's MiniMax-H3 key layout (`dmad_minimax_h3_4step_{lora_critic,full_critic}_comfyui.safetensors`,
-2.0 GB each); sample them with ComfyUI's `lcm` sampler and `simple` scheduler (the students' re-noise rule and sigma grid)
+The `_comfyui` files are the same two LoRAs converted exactly to ComfyUI's MiniMax-H3 key layout, for ComfyUI; sample
+them with ComfyUI's `lcm` sampler and `simple` scheduler (the students' re-noise rule and sigma grid)
 or the equivalent nodes in [`comfyui/ComfyUI-DMAD`](comfyui/ComfyUI-DMAD/).
 
 

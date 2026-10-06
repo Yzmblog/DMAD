@@ -2,8 +2,7 @@
 
 Protocol as in DMD2 (main/sdxl/test_folder_sdxl.py upstream): 10k COCO-2014 prompts, per-batch noise from
 torch.Generator().manual_seed(batch_index), batch size 4, seed 10, fp32; FID and patch FID against the COCO-10k
-reference images at 512px, CLIP score with ViT-g/14. Optional PickScore, HPSv2 / HPSv2.1 and ImageReward from local
-weight files. Results are written to --result_path (JSON).
+reference images at 512px, CLIP score with ViT-g/14. Results are written to --result_path (JSON).
 
     4-step generator:  --num_step 4 --conditioning_timestep 999
     1-step generator:  --num_step 1 --conditioning_timestep 399
@@ -103,12 +102,6 @@ def parse_args():
     parser.add_argument("--total_eval_samples", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=10)
     parser.add_argument("--no_clip_score", action="store_true")
-    parser.add_argument("--pickscore_dir", type=str, help="local yuvalkirstain/PickScore_v1")
-    parser.add_argument("--pickscore_processor_dir", type=str, help="local laion/CLIP-ViT-H-14-laion2B-s32B-b79K")
-    parser.add_argument("--hps_v2_ckpt", type=str, help="local HPS_v2_compressed.pt")
-    parser.add_argument("--hps_v2_1_ckpt", type=str, help="local HPS_v2.1_compressed.pt")
-    parser.add_argument("--image_reward_path", type=str, help="local ImageReward.pt")
-    parser.add_argument("--image_reward_med_config", type=str, help="local med_config.json")
     parser.add_argument("--revision", type=str)
     return parser.parse_args()
 
@@ -191,19 +184,6 @@ def main():
         ))
         print(f"clip score {result['clip_score']}")
 
-    from main.sdxl.extra_metrics import compute_hps_v2, compute_image_reward, compute_pick_score
-    if args.pickscore_dir:
-        result["pick_score"] = compute_pick_score(all_images, all_captions, args.pickscore_dir, args.pickscore_processor_dir, device)
-        print(f"pick score {result['pick_score']}")
-    if args.hps_v2_ckpt:
-        result["hps_v2"] = compute_hps_v2(all_images, all_captions, args.hps_v2_ckpt, device)
-        print(f"hps v2 {result['hps_v2']}")
-    if args.hps_v2_1_ckpt:
-        result["hps_v2_1"] = compute_hps_v2(all_images, all_captions, args.hps_v2_1_ckpt, device)
-        print(f"hps v2.1 {result['hps_v2_1']}")
-    if args.image_reward_path:
-        result["image_reward"] = compute_image_reward(all_images, all_captions, args.image_reward_path, args.image_reward_med_config, device)
-        print(f"image reward {result['image_reward']}")
     result["elapsed_sec"] = round(time.time() - start_time, 1)
 
     if args.grid_path:
