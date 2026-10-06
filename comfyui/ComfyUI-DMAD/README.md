@@ -1,11 +1,13 @@
 # ComfyUI-DMAD
 
-Custom nodes that run the DMAD 4-step students of MiniMax-H3 in ComfyUI the way they were trained:
+Custom nodes that run the DMAD 4-step students of MiniMax-H3 in ComfyUI the way they were trained. ComfyUI's stock
+`lcm` sampler with the `simple` scheduler (after `ModelSamplingMiniMaxH3`) implements the same rule and sigma grid and
+gives bit-identical videos, so these nodes are a convenience; either works.
 
 * **DMAD Sampler (re-noise)** — a `SAMPLER` for `SamplerCustom` / `SamplerCustomAdvanced`. At every step the model
   predicts the clean sample x0 and the next input is x0 re-noised with *fresh* noise at the next sigma
-  (x' = (1 − σ') x0 + σ' ε), the DMD-style multistep rule the students were trained with. Stock samplers (Euler, ...)
-  follow the ODE from x_t instead, which is not the students' operating point.
+  (x' = (1 − σ') x0 + σ' ε), the DMD-style multistep rule the students were trained with (the same update as `lcm`). ODE samplers
+  (euler, ...) step from x_t instead, which is not the students' operating point.
 * **DMAD Sigmas** — the students' sigma grid: shifted linear from 1 to 0, shift 12 (video), `steps` model evaluations.
 
 The ComfyUI-layout LoRAs, [`comfyui/dmad_minimax_h3_4step_{lora_critic,full_critic}_comfyui.safetensors`](https://huggingface.co/ZhengmingYu/DMAD/tree/main/comfyui)
@@ -33,7 +35,8 @@ UNETLoader (minimax_h3_fl2va_*.safetensors)
   -> LoraLoaderModelOnly (dmad_minimax_h3_4step_lora_critic_comfyui.safetensors, strength 1.0)
   -> ModelSamplingMiniMaxH3 (shift_video 12.0, shift_audio 2.0)
   -> BasicGuider (conditioning from MiniMax H3 Image to Video / CLIPTextEncode with the minimax CLIP)
-SamplerCustomAdvanced: noise = RandomNoise, guider as above, sampler = DMAD Sampler, sigmas = DMAD Sigmas (steps 4, shift 12),
+SamplerCustomAdvanced: noise = RandomNoise, guider as above, sampler = DMAD Sampler, sigmas = DMAD Sigmas (steps 4, shift 12)
+                       (or sampler = KSamplerSelect lcm, sigmas = BasicScheduler simple, 4 steps: identical result),
                        latent_image = Empty MiniMax H3 AV Latent (1344 x 768, 124 frames)
   -> VAEDecode (video VAE) + VAEDecodeAudio (audio VAE) -> Create Video (24 fps) -> Save Video
 ```
@@ -44,10 +47,10 @@ were trained with 2.0), **4 steps** with the DMAD Sigmas node. The students are 
 same sampler also supports more steps (`steps` in DMAD Sigmas; sampling time scales linearly): on prompts with fast
 motion, 8 and 12 steps render the fast movements cleaner than 4-step.
 
-## Why the sampler matters
+## Re-noise sampling vs an ODE sampler
 
 Measured in ComfyUI 0.38 (Comfy-Org `fl2va_bf16`, `full_critic` LoRA, 7 high-motion prompts, seed 42), mean
-Laplacian variance of the frames as a sharpness proxy, DMAD sampler / euler at the same sigmas:
+Laplacian variance of the frames as a sharpness proxy, DMAD sampler (= `lcm`) / euler at the same sigmas:
 
 | steps | 2 | 4 | 6 | 8 | 10 | 12 | 25 |
 |---|---|---|---|---|---|---|---|
