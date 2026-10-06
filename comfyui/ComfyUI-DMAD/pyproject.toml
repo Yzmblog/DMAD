@@ -1,0 +1,14 @@
+[project]
+name = "comfyui-dmad"
+description = "DMAD re-noise sampler and sigma grid for the DMAD 4-step students of MiniMax-H3 (ComfyUI custom nodes)."
+version = "0.1.0"
+license = { text = "Apache-2.0" }
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/Yzmblog/DMAD"
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-DMAD"
+Icon = ""

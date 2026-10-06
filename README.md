@@ -51,6 +51,8 @@ This repository contains:
   (the sampler of all results in the paper), on one 80 GB GPU or, with `--low-vram`, on a 24 GB consumer GPU
 * 🧩 [`run_diffusers_pipeline.py`](run_diffusers_pipeline.py): the students inside the official Diffusers
   `MiniMaxH3ModularPipeline`
+* 🎛️ [`comfyui/ComfyUI-DMAD`](comfyui/ComfyUI-DMAD/): ComfyUI nodes for the re-noise sampler and the students' sigma
+  grid, with ComfyUI-layout copies of the LoRAs on the Hugging Face repo
 * 🏋️ [`train/`](train/): the DMAD training code for ImageNet-64 and SDXL ([`train/image`](train/image/)), Wan2.1
   ([`train/wan`](train/wan/)) and MiniMax-H3 ([`train/h3`](train/h3/)), each with its own README, environment and
   evaluation
@@ -108,6 +110,10 @@ hf download ZhengmingYu/DMAD --include "minimax_h3/*" --local-dir ckpt
 Both are rank-128 LoRAs (alpha 128) on the attention projections and the two feed-forward layers of all 50
 transformer blocks and the 2 token-refiner blocks, in the Diffusers key layout (`<module>.lora.down.weight`,
 `<module>.lora.up.weight`). The safetensors metadata records the rank, alpha and fusion rule.
+
+For ComfyUI, [`comfyui/`](https://huggingface.co/ZhengmingYu/DMAD/tree/main/comfyui) on the Hugging Face repo holds the same two LoRAs
+converted exactly to ComfyUI's MiniMax-H3 key layout (`dmad_minimax_h3_4step_{lora_critic,full_critic}_comfyui.safetensors`,
+2.0 GB each); sample them with the nodes in [`comfyui/ComfyUI-DMAD`](comfyui/ComfyUI-DMAD/).
 
 
 ## 🎥 Inference
