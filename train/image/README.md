@@ -62,9 +62,7 @@ mkdir -p $CHECKPOINT_PATH
 bash scripts/download_imagenet.sh $CHECKPOINT_PATH
 
 # teacher samples (Q): 1M EDM samples, stochastic Heun sampler with 256 steps (S_churn 40, S_min 0.05, S_max 50,
-# S_noise 1.003), seed 10 + index, class = index mod 1000
-wget HF_PLACEHOLDER -O $CHECKPOINT_PATH/edm_teacher_samples_lmdb.zip && unzip $CHECKPOINT_PATH/edm_teacher_samples_lmdb.zip -d $CHECKPOINT_PATH
-# or generate them (8 GPUs):
+# S_noise 1.003), seed 10 + index, class = index mod 1000; generated with 8 GPUs:
 torchrun --nproc_per_node 8 main/edm/generate_teacher_samples.py --model_path $CHECKPOINT_PATH/edm-imagenet-64x64-cond-adm.pkl \
     --ref_path $CHECKPOINT_PATH/imagenet_fid_refs_edm.npz --detector_url $CHECKPOINT_PATH/inception-2015-12-05.pkl \
     --output_dir $CHECKPOINT_PATH --run_name edm_teacher_samples --total_eval_samples 1000000

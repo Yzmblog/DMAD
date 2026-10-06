@@ -92,10 +92,7 @@ Each training row holds:
 There are 42,158 rows in total.
 
 ```bash
-# download the prepared shards
-huggingface-cli download HF_PLACEHOLDER --repo-type dataset --local-dir $DATA/shards
-
-# or build them: UltraVideo_short.csv + clips_short_960 from huggingface.co/datasets/APRIL-AIGC/UltraVideo
+# build the shards: UltraVideo_short.csv + clips_short_960 from huggingface.co/datasets/APRIL-AIGC/UltraVideo
 ULTRAVIDEO=/path/to/UltraVideo DATA=/path/to/data bash experiments/dmad/prepare_data.sh
 ```
 
