@@ -52,7 +52,8 @@ This repository contains:
 * 🧩 [`run_diffusers_pipeline.py`](run_diffusers_pipeline.py): the students inside the official Diffusers
   `MiniMaxH3ModularPipeline`
 * 🎛️ [`comfyui/ComfyUI-DMAD`](comfyui/ComfyUI-DMAD/): ComfyUI usage of the students (ComfyUI-layout LoRAs on the Hugging
-  Face repo; stock `lcm` + `simple` sampling, or the equivalent nodes in this folder)
+  Face repo; stock `lcm` + `simple` sampling, or the equivalent nodes in this folder), with
+  [ready-to-run 4- and 8-step workflows](comfyui/ComfyUI-DMAD/README.md#ready-to-run-workflows-24-gb-gpu) for 24 GB GPUs
 * 🏋️ [`train/`](train/): the DMAD training code for ImageNet-64 and SDXL ([`train/image`](train/image/)), Wan2.1
   ([`train/wan`](train/wan/)) and MiniMax-H3 ([`train/h3`](train/h3/)), each with its own README, environment and
   evaluation
