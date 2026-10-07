@@ -16,6 +16,7 @@ and the same op order, only *where the weights live* differs.
 import json
 import math
 import queue
+import sys
 import threading
 from pathlib import Path
 
@@ -27,8 +28,16 @@ _ALIGN = 256
 _DTYPES = {"BF16": torch.bfloat16, "F16": torch.float16, "F32": torch.float32}
 
 
+def _safe_open(path):
+    """On Windows a memory-mapped shard is charged in full to the system commit for as long as it stays open, so
+    shards are read with positioned reads there (safetensors >= 0.8.0); other platforms keep the default mmap."""
+    if sys.platform == "win32":
+        return safe_open(str(path), "pt", backend="pread")
+    return safe_open(str(path), "pt")
+
+
 class ShardIndex:
-    """tensor name -> shard of a safetensors directory; shards stay open (memory-mapped) once touched."""
+    """tensor name -> shard of a safetensors directory; shards stay open once touched."""
 
     def __init__(self, directory):
         self.directory = Path(directory).expanduser().resolve()
@@ -39,7 +48,7 @@ class ShardIndex:
                 self.where[key] = self.directory / fname
         else:
             for path in sorted(self.directory.glob("*.safetensors")):
-                with safe_open(str(path), "pt") as f:
+                with _safe_open(path) as f:
                     for key in f.keys():
                         self.where[key] = path
         if not self.where:
@@ -50,7 +59,7 @@ class ShardIndex:
     def _handle(self, path):
         with self._lock:
             if path not in self._handles:
-                self._handles[path] = safe_open(str(path), "pt")
+                self._handles[path] = _safe_open(path)
             return self._handles[path]
 
     def keys(self):
