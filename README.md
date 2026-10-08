@@ -30,8 +30,9 @@ teacher into a 4-step generator of 1344x768 video with native stereo audio.
 
 ## 🗣️ Updates
 
-* **2026/10/08:** 16 GB GPUs: `--low-vram` now also makes 15 s videos, and both it and the ComfyUI workflows fit in
-  14 GiB of GPU memory with output bit-identical to the larger-GPU runs 🪶
+* **2026/10/08:** 16 GB GPUs: [`--low-vram`](#on-consumer-gpus) now also makes 15 s videos, and both it and the
+  [ComfyUI workflows](comfyui/README.md#ready-to-run-workflows-24-gb-gpu) fit in 14 GiB of GPU memory with output
+  bit-identical to the larger-GPU runs 🪶
 * **2026/10/07:** Ready-to-run [ComfyUI workflows](comfyui/README.md#ready-to-run-workflows-24-gb-gpu) (4 and 8 steps,
   15 s of video with audio) that run on a 24 GB GPU 🎛️
 * **2026/10/07:** `--low-vram` now also works on Windows, thanks to [@hiroki-abe-58](https://github.com/hiroki-abe-58) ([#6](https://github.com/Yzmblog/DMAD/pull/6))
