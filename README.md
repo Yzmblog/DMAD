@@ -28,6 +28,17 @@ This repository contains the **4-step DMAD students of [MiniMax-H3](https://hugg
 (33B, text-to-audio-video)** and the code to run them: a LoRA of rank 128 on the H3 transformer turns the 50-step
 teacher into a 4-step generator of 1344x768 video with native stereo audio.
 
+## 🗣️ Updates
+
+* **2026/10/07:** Ready-to-run [ComfyUI workflows](comfyui/README.md#ready-to-run-workflows-24-gb-gpu) (4 and 8 steps,
+  15 s of video with audio) that run on a 24 GB GPU 🎛️
+* **2026/10/07:** `--low-vram` now also works on Windows, thanks to [@hiroki-abe-58](https://github.com/hiroki-abe-58) ([#6](https://github.com/Yzmblog/DMAD/pull/6))
+* **2026/10/06:** The DMAD weights of Wan2.1 (1.3B, 14B), SDXL and ImageNet-64 and the
+  [MiniMax-H3 training data](https://huggingface.co/datasets/ZhengmingYu/DMAD-H3-data) are on Hugging Face 🤗
+* **2026/10/05:** Training code for ImageNet-64, SDXL, Wan2.1 and MiniMax-H3, and [ComfyUI support](comfyui/) 🏋️
+* **2026/10/04:** `--low-vram` inference on a 24 GB consumer GPU ⚡️
+* **2026/10/02:** Inference code and the 4-step MiniMax-H3 students released 🚀
+
 ## 📝 Abstract
 
 > Distribution Matching Distillation (DMD) trains a few-step student on the difference between target and student
