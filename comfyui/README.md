@@ -61,6 +61,13 @@ ComfyUI-Manager), which both workflows include. Without it, 5 s (length 124) fit
 the one made with the memory node. Times are end to end (model loading, text encoding, sampling, decoding) on an H200
 with the PyTorch allocator capped at 24 GiB; a consumer GPU is slower, and sampling time scales linearly with steps.
 
+**16 GB and 22 GB GPUs.** Both workflows also run unchanged with the GPU memory capped at 14 GiB (room for a 16 GB
+card's desktop and CUDA context): ComfyUI's dynamic VRAM then keeps less of the model resident and streams more of it
+from system memory, and the videos are bit-identical to the 24 GiB runs (15 s with the memory node, and 5 s with
+stock nodes only). What grows is system memory: about 46 GiB in use, so 64 GB of RAM is recommended. On the H200 the
+4-step 15 s workflow took 470 s at the 14 GiB cap, and a 4-step 5 s video with stock nodes 126 s. GPUs without native
+bf16 (RTX 20 series and older) run the bf16 math emulated, which is much slower; we have not measured them.
+
 ## Workflow (text-to-audio-video)
 
 ```

@@ -18,7 +18,10 @@ import os
 import sys
 import time
 
-import torch
+if "--low-vram" in sys.argv:  # set before CUDA starts: no fragmentation headroom is needed on small GPUs
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
+import torch  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -64,7 +67,7 @@ def parse_args():
                    help="Stream the transformer to the GPU one block at a time (for GPUs where the 66 GB model "
                         "plus activations do not fit).")
     p.add_argument("--low-vram", action="store_true",
-                   help="For consumer GPUs (24 GB): stream the text encoder and the transformer from the checkpoint files one "
+                   help="For consumer GPUs (16 GB and up): stream the text encoder and the transformer from the checkpoint files one "
                         "layer at a time and keep only the VAE decoders resident. The output is identical to the "
                         "default path.")
     p.add_argument("--weights-in-ram", action="store_true",
@@ -77,6 +80,10 @@ def parse_args():
     p.add_argument("--weights-cache", metavar="DIR",
                    help="With --weights-int8 and without --weights-in-ram: where the int8 copy of the weights is "
                         "written once (18 GB; default ~/.cache/dmad_h3/<checkpoint>/int8).")
+    p.add_argument("--chunk-rows", type=int, default=16384, metavar="N",
+                   help="With --low-vram: run the transformer blocks at most N rows of the packed sequence at a time "
+                        "(attention per chunk of queries), so 15 s videos fit a 16 GB GPU; 0 disables it. On an H200 "
+                        "the output is bit-identical to the unchunked path at 16384 and 12288.")
     p.add_argument("--vae-dtype", choices=["fp32", "bf16"], default="fp32",
                    help="Precision of the video VAE decode (fp32 as released; bf16 is about twice as fast and "
                         "halves its memory, at ~42 dB PSNR to the fp32 decode). The audio VAE always runs in fp32.")
@@ -143,7 +150,7 @@ def main():
         timesteps = [build_row_timesteps(layouts[0], video_sigmas[s], audio_sigmas[s])[0] for s in range(args.steps)]
         streamed = LowMemTransformer(args.model_dir, pairs, rank, alpha, timesteps, device, torch.bfloat16,
                                      cache_in_ram=args.weights_in_ram, codec="int8" if args.weights_int8 else None,
-                                     cache_dir=args.weights_cache, log=log)
+                                     cache_dir=args.weights_cache, log=log, chunk_rows=args.chunk_rows)
         transformer = streamed.model
         log(f"LoRA attached: {len(pairs)} modules, rank {rank}, alpha {alpha:g}; streaming "
             f"{streamed.streamer.bytes_per_pass / 2**30:.1f} GiB of weights per model evaluation{host_memory()}")
@@ -180,7 +187,7 @@ def main():
     vae_dtype = {"fp32": torch.float32, "bf16": torch.bfloat16}[args.vae_dtype]
     vae, audio_vae = load_vaes(args.model_dir, device, decoder_only=args.low_vram, dtype=vae_dtype)
     for i, ((video_rows, audio_rows), prompt) in enumerate(zip(rows, prompts)):
-        frames, wav = decode_rows(vae, audio_vae, video_rows, audio_rows, shape, geometry)
+        frames, wav = decode_rows(vae, audio_vae, video_rows, audio_rows, shape, geometry, stream_frames=args.low_vram)
         out = os.path.join(args.output_dir, f"{i:04d}.mp4")
         write_mp4(frames, wav, out)
         with open(os.path.join(args.output_dir, f"{i:04d}.txt"), "w", encoding="utf-8") as f:

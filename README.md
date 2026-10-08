@@ -30,6 +30,8 @@ teacher into a 4-step generator of 1344x768 video with native stereo audio.
 
 ## 🗣️ Updates
 
+* **2026/10/08:** 16 GB GPUs: `--low-vram` now also makes 15 s videos, and both it and the ComfyUI workflows fit in
+  14 GiB of GPU memory with output bit-identical to the larger-GPU runs 🪶
 * **2026/10/07:** Ready-to-run [ComfyUI workflows](comfyui/README.md#ready-to-run-workflows-24-gb-gpu) (4 and 8 steps,
   15 s of video with audio) that run on a 24 GB GPU 🎛️
 * **2026/10/07:** `--low-vram` now also works on Windows, thanks to [@hiroki-abe-58](https://github.com/hiroki-abe-58) ([#6](https://github.com/Yzmblog/DMAD/pull/6))
@@ -59,12 +61,12 @@ This repository contains:
 
 * 🪐 Two DMAD student LoRAs (rank 128, 1.4 GB each): `lora_critic` (the checkpoint of the paper) and `full_critic` (a full-critic variant that scores higher on AVGen-Bench)
 * ⚡️ [`inference.py`](inference.py): few-step sampling with the re-noise step rule the students were trained with
-  (the sampler of all results in the paper), on one 80 GB GPU or, with `--low-vram`, on a 24 GB consumer GPU
+  (the sampler of all results in the paper), on one 80 GB GPU or, with `--low-vram`, on a 16 GB consumer GPU
 * 🧩 [`run_diffusers_pipeline.py`](run_diffusers_pipeline.py): the students inside the official Diffusers
   `MiniMaxH3ModularPipeline`
 * 🎛️ [`comfyui/`](comfyui/): ComfyUI usage of the students (ComfyUI-layout LoRAs on the Hugging Face repo; stock
   `lcm` + `simple` sampling, or the equivalent nodes in [`comfyui/ComfyUI-DMAD`](comfyui/ComfyUI-DMAD/)), with
-  [ready-to-run 4- and 8-step workflows](comfyui/README.md#ready-to-run-workflows-24-gb-gpu) for 24 GB GPUs
+  [ready-to-run 4- and 8-step workflows](comfyui/README.md#ready-to-run-workflows-24-gb-gpu) for 16–24 GB GPUs
 * 🏋️ [`train/`](train/): the DMAD training code for ImageNet-64 and SDXL ([`train/image`](train/image/)), Wan2.1
   ([`train/wan`](train/wan/)) and MiniMax-H3 ([`train/h3`](train/h3/)), each with its own README, environment and
   evaluation
@@ -166,10 +168,11 @@ transformer stage.
 | `--height`, `--width` | 768, 1344 | multiples of 32 |
 | `--num-frames` | 124 | must be `17 * n + 5`; the students were trained at 124 |
 | `--offload` | off | keep the transformer in host memory and stream it to the GPU one block at a time (for an 80 GB GPU: the text encoder still needs 62 GiB) |
-| `--low-vram` | off | the consumer-GPU path (24 GB): text encoder and transformer streamed layer by layer from the checkpoint files, see below |
+| `--low-vram` | off | the consumer-GPU path (16 GB and up): text encoder and transformer streamed layer by layer from the checkpoint files, see below |
 | `--weights-in-ram` | off | with `--low-vram`: keep a pinned host copy of the streamed transformer weights (36 GB; 18 GB with `--weights-int8`) instead of re-reading them from disk at every step |
 | `--weights-int8` | off | with `--low-vram`: int8 per-row weights, dequantized on the GPU before use; halves host memory / disk traffic, changes the samples (see below) |
 | `--weights-cache` | `~/.cache/dmad_h3/...` | with `--weights-int8` and without `--weights-in-ram`: where the int8 copy is written once (18 GB) |
+| `--chunk-rows` | 16384 | with `--low-vram`: the transformer blocks run at most this many rows of the packed sequence at a time (attention per chunk of queries); `0` turns it off |
 | `--vae-dtype` | fp32 | `bf16` decodes the video about twice as fast at ~42 dB PSNR to the fp32 decode (audio VAE always fp32) |
 
 **Prompts.** MiniMax-H3 was trained on long, structured descriptions (an `integrated_multimodal_description:` shot
@@ -186,27 +189,46 @@ with fast motion (martial arts, boxing, a dunk) we see 8 and 12 steps render the
 ```bash
 python inference.py --model-dir models/MiniMax-H3 --lora ckpt/minimax_h3/dmad_minimax_h3_4step_lora_critic.safetensors \
     --prompt-file prompts/dmad_sweater.txt --seed 42 --output-dir outputs/dmad_sweater --low-vram
+# a 15 s video: add --num-frames 362
 ```
 
 `--low-vram` never keeps the 32B text encoder or the 33B transformer on the GPU: their layers are streamed from the
 checkpoint files one at a time through two rotating buffers while the previous layer computes, and the transformer's
-AdaLN projections (13B parameters that depend only on the sampling step) are evaluated once per step up front. The
-same modules run in the same precision and order as the default path, so **the output is bit-identical** (verified:
-frames and audio md5-identical to the default path under a 24 GiB allocator cap on an H200). What it costs, at the
-default 1344x768, 124 frames, 4 steps:
+AdaLN projections (13B parameters that depend only on the sampling step) are evaluated once per step up front. On top
+of that it keeps the activations small: the transformer blocks run 16384 rows of the packed sequence at a time
+(`--chunk-rows`; only the attention sees the whole sequence, one chunk of queries at a time), the video is decoded
+clip by clip straight into host memory, and PyTorch's allocator runs with `expandable_segments`. The same modules run in
+the same precision and order as the default path, so **the output is bit-identical** (verified on an H200: frames and
+audio md5-identical to the resident path at 124 frames and to the unchunked path at 362 frames, under a 14 GiB
+allocator cap). What it costs, at 1344x768 and 4 steps:
 
-| | GPU memory (peak) | host memory | per model evaluation |
+| | GPU memory (peak), 124 frames / 362 frames | host memory | per model evaluation |
 |---|---|---|---|
-| text encoding | 3.4 GiB | page cache only | 49 GB read once per prompt |
-| sampling | 12.9 GiB | ~1 GB + 1.4 GB pinned staging (+36 GB pinned with `--weights-in-ram`, +18 GB with `--weights-int8`) | 36 GB of weights streamed (18 GB with `--weights-int8`) |
-| decoding | 14.2 GiB (8.6 GiB with `--vae-dtype bf16`) | | |
+| text encoding | 3.4 / 3.4 GiB | page cache only | 49 GB read once per prompt |
+| sampling | 8.0 / 13.3 GiB | ~1 GB + 1.4 GB pinned staging (+36 GB pinned with `--weights-in-ram`, +18 GB with `--weights-int8`) | 36 GB of weights streamed (18 GB with `--weights-int8`) |
+| decoding | 12.6 / 12.7 GiB | 1.6 / 2.3 GiB | |
 
-Sampling is compute-bound on consumer GPUs, so the stream is hidden behind the matrix multiplies as long as the
-weights come from host memory or an NVMe (5–7 GB/s); on the H200 the streamed path samples in the same 37 s per
-video as the resident path. One model evaluation is 2.9 PFLOP (38k tokens, attention is over half of it); from the
-H200's measured utilization we estimate about 1 minute per evaluation on an RTX 4090 / 5090 and twice that on an
-RTX 3090, i.e. 4–8 minutes of sampling per video plus the decode. The memory figures above are measured under a
-24 GiB allocator cap.
+So both the default 5 s and a 15 s video fit a **16 GB GPU** (all peaks under 14 GiB, which leaves room for the CUDA
+context and the desktop), and a 24 GB one with headroom. Sampling is compute-bound on consumer GPUs, so the stream is
+hidden behind the matrix multiplies as long as the weights come from host memory or an NVMe (5–7 GB/s); on the H200
+the streamed path samples in the same 37 s per video as the resident path. One model evaluation is 2.9 PFLOP at 124
+frames (38k tokens, attention is over half of it); from the H200's measured utilization we estimate about 1 minute
+per evaluation on an RTX 4090 / 5090 and twice that on an RTX 3090, i.e. 4–8 minutes of sampling per 5 s video plus
+the decode. A 15 s video has 2.9x the tokens and, with attention growing quadratically, about 6x the compute. GPUs
+without native bf16 (RTX 20 series and older) run the bf16 math emulated, which is much slower; we have not
+measured them.
+
+**Defaults and faster settings.** `--low-vram` is tuned for the smallest GPUs and never trades output for speed. With
+more memory, these make it faster:
+
+| if you have | use | effect |
+|---|---|---|
+| an 80 GB GPU | no `--low-vram` (resident models) | fastest; nothing is streamed |
+| 48 GB+ of host memory | `--low-vram --weights-in-ram` | the transformer weights are read from disk once instead of at every step (36 GB per model evaluation); same output |
+| a slow disk and little host memory | `--low-vram --weights-int8` | halves the weight traffic and the host copy; a different sample (see below) |
+| any GPU, to shorten the decode | `--vae-dtype bf16` | about twice as fast a video decode at ~42 dB PSNR to the fp32 decode |
+
+`--chunk-rows 0` turns the row chunking off for GPUs that do not need it, but it did not change the speed on the H200.
 
 `--weights-int8` halves the weight traffic and the host copy. The 4-step student amplifies any change to the
 weights into a *different* sample: over 13 prompts the int8 videos are 14–26 dB PSNR (mean 19.6) from the exact

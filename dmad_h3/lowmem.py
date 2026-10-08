@@ -11,6 +11,7 @@ and the same op order, only *where the weights live* differs.
   are computed once per step up front and the projections are replaced by table lookups; the per-step stream is then
   0.69 GB per block (35 GB per model evaluation) instead of 1.3 GB.
 * Everything else stays resident: token refiner, embedders, output heads, time embedder, the LoRA.
+* Optionally (`chunk_rows`) the transformer blocks run row-chunked for long videos, see `_chunked_block_forward`.
 """
 
 import json
@@ -411,6 +412,49 @@ class AdaLNTables(nn.Module):
         raise RuntimeError("timestep not among the precomputed AdaLN tables; the sampling schedule changed")
 
 
+def _chunked_block_forward(block, rows):
+    """A `MiniMaxH3TransformerBlock.forward` that holds at most `rows` rows of every intermediate except q, k, v and
+    the attention output. Everything but the attention itself is per row (norms, AdaLN modulation, projections,
+    rotary, feed-forward), so those run chunk by chunk and the residual stream is updated in place; the attention
+    still sees the whole sequence. Same ops and dtypes as the stock forward, but the matmuls run on smaller matrices,
+    so results can differ from it in the last bits."""
+    from diffusers.models.attention_dispatch import dispatch_attention_fn
+    from diffusers.models.transformers.transformer_minimax_h3 import _apply_rotary_emb
+
+    attn = block.attn
+
+    def forward(hidden_states, temb, adaln_indices, rotary_emb, attention_mask=None):
+        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = block.adaln_proj(temb)
+        cos, sin = rotary_emb
+        n = hidden_states.shape[1]
+        size = -(-n // -(-n // rows))  # equal chunks of at most `rows` (no small tail chunk with its own matmul kernel)
+        spans = [(s, min(s + size, n)) for s in range(0, n, size)]
+        q, k, v = (hidden_states.new_empty(hidden_states.shape[0], n, attn.heads, attn.head_dim) for _ in range(3))
+        for s, e in spans:
+            idx = adaln_indices[s:e]
+            x = block.norm1(hidden_states[:, s:e]) * (1.0 + scale_msa.index_select(0, idx)) + shift_msa.index_select(0, idx)
+            q[:, s:e] = _apply_rotary_emb(attn.norm_q(attn.to_q(x).unflatten(-1, (attn.heads, -1))), cos[s:e], sin[s:e])
+            k[:, s:e] = _apply_rotary_emb(attn.norm_k(attn.to_k(x).unflatten(-1, (attn.heads, -1))), cos[s:e], sin[s:e])
+            v[:, s:e] = attn.to_v(x).unflatten(-1, (attn.heads, -1))
+        # every query row attends to the full k / v independently, so the attention runs per chunk of queries and
+        # its output is projected and added to the residual stream right away (q, k, v already hold every row)
+        for s, e in spans:
+            idx = adaln_indices[s:e]
+            out = dispatch_attention_fn(q[:, s:e], k, v, attn_mask=attention_mask, dropout_p=0.0, is_causal=False,
+                                        backend=attn.processor._attention_backend,
+                                        parallel_config=attn.processor._parallel_config)
+            hidden_states[:, s:e] = hidden_states[:, s:e] + gate_msa.index_select(0, idx) * attn.to_out[0](out.flatten(2, 3))
+        del q, k, v, out
+        for s, e in spans:
+            idx = adaln_indices[s:e]
+            h = hidden_states[:, s:e]
+            x = block.norm2(h) * (1.0 + scale_mlp.index_select(0, idx)) + shift_mlp.index_select(0, idx)
+            hidden_states[:, s:e] = h + gate_mlp.index_select(0, idx) * block.ff(x)
+        return hidden_states
+
+    return forward
+
+
 class LowMemTransformer:
     """The H3 transformer with the DMAD LoRA: blocks streamed, AdaLN tabulated, the rest resident.
 
@@ -419,10 +463,10 @@ class LowMemTransformer:
     """
 
     def __init__(self, model_dir, lora_pairs, rank, alpha, timesteps, device, dtype=torch.bfloat16, cache_in_ram=False,
-                 codec=None, cache_dir=None, log=None):
+                 codec=None, cache_dir=None, log=None, chunk_rows=None):
         """`codec` ("int8") stores the streamed weights 8-bit: quantized on the way into host memory with
         `cache_in_ram`, else written once to `cache_dir` (default `~/.cache/dmad_h3/<checkpoint id>/<codec>`) and
-        streamed from there."""
+        streamed from there. `chunk_rows` runs the transformer blocks row-chunked (`_chunked_block_forward`)."""
         import hashlib
 
         from accelerate import init_empty_weights
@@ -467,7 +511,10 @@ class LowMemTransformer:
         self.model = model
 
         self._tabulate_adaln(timesteps, blocks)
-        streamed = [[k for k in blocks[i] if ".adaln_proj." not in k] for i in range(len(blocks))]
+        if chunk_rows:
+            for block in model.transformer_blocks:
+                block.forward = _chunked_block_forward(block, chunk_rows)
+        streamed =[[k for k in blocks[i] if ".adaln_proj." not in k] for i in range(len(blocks))]
         if codec is not None and not cache_in_ram and cache_dir is None:
             checkpoint_id = hashlib.sha1(str(tdir).encode()).hexdigest()[:12]
             cache_dir = Path.home() / ".cache" / "dmad_h3" / checkpoint_id / codec

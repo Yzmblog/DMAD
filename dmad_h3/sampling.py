@@ -98,9 +98,50 @@ def rollout(transformer, prompt_embeds, layout, shape, geometry, video_sigmas, a
     return x0[0].float().cpu(), x0[1].float().cpu()
 
 
+def _decode_to_frames(vae, z, to_frames):
+    """`vae.decode(z).sample` followed by `to_frames`, one temporal clip at a time: the loop of the H3 VAE's `_decode`
+    (clips decoded separately, consecutive clips cross-faded, padded tail frames cut), except that every finished
+    chunk is converted by `to_frames` on the GPU and moved to host memory at once, so the GPU never holds the whole
+    float video. `to_frames` is elementwise, so the frames are identical to converting the full decode."""
+    tokens_chunk_size, token_drop = vae.tokens_chunk_size, vae.config.token_drop
+    temporal_ratio = vae.temporal_compression_ratio
+    chunk_num_frames = tokens_chunk_size * temporal_ratio
+    num_tokens = z.shape[2] + token_drop
+    pad_tokens = (-num_tokens) % tokens_chunk_size
+    num_chunks = (num_tokens + pad_tokens) // tokens_chunk_size - int(token_drop > 0)
+    if pad_tokens > 0:
+        z = torch.cat([z, z[:, :, -1:].repeat(1, 1, pad_tokens, 1, 1)], dim=2)
+    frames, overlap = [], None
+    for i in range(num_chunks):
+        start = i * tokens_chunk_size
+        clip = vae._decode_clip(z[:, :, start : start + tokens_chunk_size + vae.token_overlap])
+        for j in range(int(token_drop > 0) + 1):
+            chunk = clip[:, :, j * chunk_num_frames : (j + 1) * chunk_num_frames][:, :, vae.frame_pre_padding :]
+            if j == 0:
+                if overlap is not None:
+                    chunk = vae._blend(overlap, chunk, vae.frame_overlap, dim=-3)
+                frames.append(to_frames(chunk))
+            else:
+                overlap = chunk
+        del clip
+    if overlap is not None:
+        frames.append(to_frames(overlap))
+    frames = np.concatenate(frames, axis=0)
+    if pad_tokens > 0:
+        intra_tail = vae.config.clip_length % temporal_ratio
+        num_tokens_before_pad = z.shape[2] - pad_tokens
+        pad_frames = sum(
+            intra_tail if intra_tail and (num_tokens_before_pad + k) % tokens_chunk_size == 0 else temporal_ratio
+            for k in range(pad_tokens)
+        )
+        frames = frames[:-pad_frames]
+    return frames
+
+
 @torch.no_grad()
-def decode_rows(vae, audio_vae, video_rows, audio_rows, shape, geometry):
-    """Packed latent rows -> (uint8 frames [T, H, W, 3], float32 waveform [N, 2])."""
+def decode_rows(vae, audio_vae, video_rows, audio_rows, shape, geometry, stream_frames=False):
+    """Packed latent rows -> (uint8 frames [T, H, W, 3], float32 waveform [N, 2]). `stream_frames` decodes clip by
+    clip into host memory (`_decode_to_frames`): same frames, a fraction of the GPU memory for long videos."""
     device, vae_dtype = next(vae.parameters()).device, next(vae.parameters()).dtype
     vm = torch.tensor(vae.config.latents_mean, device=device).view(1, -1, 1, 1, 1)
     vs = torch.tensor(vae.config.latents_std, device=device).view(1, -1, 1, 1, 1)
@@ -112,10 +153,14 @@ def decode_rows(vae, audio_vae, video_rows, audio_rows, shape, geometry):
     hh, ww = shape["latent_height"] // ph, shape["latent_width"] // pw
     z = video_rows.float().to(device).reshape(t, hh, ww, video_channels, ph, pw)
     z = z.permute(3, 0, 1, 4, 2, 5).reshape(1, video_channels, t, hh * ph, ww * pw)
-    px = vae.decode((z * vs + vm).to(vae_dtype)).sample
-    pm = torch.tensor(PIXEL_MEAN, device=px.device).view(3, 1, 1, 1)
-    ps = torch.tensor(PIXEL_STD, device=px.device).view(3, 1, 1, 1)
-    frames = ((px[0].float() * ps + pm).clamp(0, 1) * 255.0).round().byte().cpu().numpy().transpose(1, 2, 3, 0)
+    pm = torch.tensor(PIXEL_MEAN, device=device).view(3, 1, 1, 1)
+    ps = torch.tensor(PIXEL_STD, device=device).view(3, 1, 1, 1)
+
+    def to_frames(px):
+        return ((px[0].float() * ps + pm).clamp(0, 1) * 255.0).round().byte().cpu().numpy().transpose(1, 2, 3, 0)
+
+    z = (z * vs + vm).to(vae_dtype)
+    frames = _decode_to_frames(vae, z, to_frames) if stream_frames else to_frames(vae.decode(z).sample)
     za = audio_rows.float().to(device).reshape(1, 2, -1, audio_channels)
     za = za[0].permute(0, 2, 1) * as_ + am
     za = za.to(next(audio_vae.parameters()).dtype)
