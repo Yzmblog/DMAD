@@ -417,7 +417,8 @@ def _chunked_block_forward(block, rows):
     the attention output. Everything but the attention itself is per row (norms, AdaLN modulation, projections,
     rotary, feed-forward), so those run chunk by chunk and the residual stream is updated in place; the attention
     still sees the whole sequence. Same ops and dtypes as the stock forward, but the matmuls run on smaller matrices,
-    so results can differ from it in the last bits."""
+    so results can differ from it in the last bits. Before q, k, v are allocated the allocator's free cached segments
+    are released, so allocators without `expandable_segments` (Windows) find the room unfragmented."""
     from diffusers.models.attention_dispatch import dispatch_attention_fn
     from diffusers.models.transformers.transformer_minimax_h3 import _apply_rotary_emb
 
@@ -429,6 +430,7 @@ def _chunked_block_forward(block, rows):
         n = hidden_states.shape[1]
         size = -(-n // -(-n // rows))  # equal chunks of at most `rows` (no small tail chunk with its own matmul kernel)
         spans = [(s, min(s + size, n)) for s in range(0, n, size)]
+        torch.cuda.empty_cache()
         q, k, v = (hidden_states.new_empty(hidden_states.shape[0], n, attn.heads, attn.head_dim) for _ in range(3))
         for s, e in spans:
             idx = adaln_indices[s:e]

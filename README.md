@@ -197,15 +197,16 @@ checkpoint files one at a time through two rotating buffers while the previous l
 AdaLN projections (13B parameters that depend only on the sampling step) are evaluated once per step up front. On top
 of that it keeps the activations small: the transformer blocks run 16384 rows of the packed sequence at a time
 (`--chunk-rows`; only the attention sees the whole sequence, one chunk of queries at a time), the video is decoded
-clip by clip straight into host memory, and PyTorch's allocator runs with `expandable_segments`. The same modules run in
-the same precision and order as the default path, so **the output is bit-identical** (verified on an H200: frames and
-audio md5-identical to the resident path at 124 frames and to the unchunked path at 362 frames, under a 14 GiB
-allocator cap). What it costs, at 1344x768 and 4 steps:
+clip by clip straight into host memory, and PyTorch's allocator runs with `expandable_segments` where it has them
+(Linux; the budget also holds without them, as on Windows). The same modules run in the same precision and order as
+the default path, so **the output is bit-identical** (verified on an H200: frames and audio md5-identical to the
+resident path at 124 frames and to the unchunked path at 362 frames, under a 14 GiB allocator cap, with and without
+`expandable_segments`). What it costs, at 1344x768 and 4 steps:
 
 | | GPU memory (peak), 124 frames / 362 frames | host memory | per model evaluation |
 |---|---|---|---|
 | text encoding | 3.4 / 3.4 GiB | page cache only | 49 GB read once per prompt |
-| sampling | 8.0 / 13.3 GiB | ~1 GB + 1.4 GB pinned staging (+36 GB pinned with `--weights-in-ram`, +18 GB with `--weights-int8`) | 36 GB of weights streamed (18 GB with `--weights-int8`) |
+| sampling | 8.0 / 13.4 GiB | ~1 GB + 1.4 GB pinned staging (+36 GB pinned with `--weights-in-ram`, +18 GB with `--weights-int8`) | 36 GB of weights streamed (18 GB with `--weights-int8`) |
 | decoding | 12.6 / 12.7 GiB | 1.6 / 2.3 GiB | |
 
 So both the default 5 s and a 15 s video fit a **16 GB GPU** (all peaks under 14 GiB, which leaves room for the CUDA
