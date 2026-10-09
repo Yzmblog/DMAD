@@ -29,10 +29,12 @@ The base model, text encoder and VAEs are the
 [Comfy-Org MiniMax-H3 repackage](https://huggingface.co/Comfy-Org/MiniMax-H3) (ComfyUI loads the `fl2va` or `ref2va`
 partition; the students were trained on the text-to-audio-video transformer, see the note below).
 
-## Ready-to-run workflows (24 GB GPU)
+<a id="ready-to-run-workflows-24-gb-gpu"></a>
+
+## Ready-to-run workflows (16 GB GPU and up)
 
 Two complete text-to-audio-video workflows in [`workflows`](workflows/) that make 15 s of 1344x768 video
-with stereo audio on a 24 GB GPU. Load the `.json`, or drag the example `.mp4` (on the Hugging Face repo; it embeds the
+with stereo audio on a 16 GB GPU or larger. Load the `.json`, or drag the example `.mp4` (on the Hugging Face repo; it embeds the
 workflow) into ComfyUI; missing models are offered for download from links stored in the workflow. Both sample with
 stock nodes (`lcm` + `simple`, `full_critic` LoRA); the ComfyUI-DMAD nodes are not needed.
 
@@ -41,8 +43,10 @@ stock nodes (`lcm` + `simple`, `full_critic` LoRA); the ComfyUI-DMAD nodes are n
 | Workflow | [`dmad_h3_4step_15s_podcast.json`](workflows/dmad_h3_4step_15s_podcast.json) | [`dmad_h3_8step_15s_wok.json`](workflows/dmad_h3_8step_15s_wok.json) |
 | Example (workflow embedded) | [`dmad_h3_4step_15s_podcast.mp4`](https://huggingface.co/ZhengmingYu/DMAD/resolve/main/minimax_h3/workflows/dmad_h3_4step_15s_podcast.mp4), seed 2 | [`dmad_h3_8step_15s_wok.mp4`](https://huggingface.co/ZhengmingYu/DMAD/resolve/main/minimax_h3/workflows/dmad_h3_8step_15s_wok.mp4), seed 4 |
 | Output | 1344x768, 362 frames = 15 s at 24 fps, stereo audio | 1344x768, 362 frames = 15 s at 24 fps, stereo audio |
-| Peak GPU memory | 24.6 GiB | 24.6 GiB |
-| Time (H200, 24 GiB cap) | 448 s, of which sampling 393 s | 845 s, of which sampling 785 s |
+| Peak GPU memory, 24 GiB cap | 24.6 GiB | 24.6 GiB |
+| Time, 24 GiB cap | 448 s, of which sampling 393 s | 845 s, of which sampling 785 s |
+| Peak GPU memory, 14 GiB cap (16 GB GPUs) | 14.7 GiB | 14.7 GiB |
+| Time, 14 GiB cap | 470 s, of which sampling 413 s | 886 s, of which sampling 832 s |
 
 ![The 4-step workflow in ComfyUI](workflows/screenshot_4step_15s.png)
 ![The 8-step workflow in ComfyUI](workflows/screenshot_8step_15s.png)
@@ -54,19 +58,19 @@ stock nodes (`lcm` + `simple`, `full_critic` LoRA); the ComfyUI-DMAD nodes are n
 | `models/vae/` | `minimax_h3_video_vae_fp16.safetensors`, `minimax_h3_audio_vae_fp32.safetensors` |
 | `models/loras/` | `dmad_minimax_h3_4step_full_critic_comfyui.safetensors` ([ZhengmingYu/DMAD](https://huggingface.co/ZhengmingYu/DMAD/tree/main/minimax_h3)) |
 
-Video lengths are 5 + 17k frames (124 = 5 s, 243 = 10 s, 362 = 15 s). On a 24 GB GPU, 15 s needs the
+Video lengths are 5 + 17k frames (124 = 5 s, 243 = 10 s, 362 = 15 s). On a 16 or 24 GB GPU, 15 s needs the
 `H3 Memory Optimization` node of [H3-Optimizations](https://github.com/Zironic/H3-Optimizations) (install with
-ComfyUI-Manager), which both workflows include. Without it, 5 s (length 124) fits in 24 GB with stock nodes only, and
+ComfyUI-Manager), which both workflows include. Without it, 5 s (length 124) fits in 16 GB with stock nodes only, and
 15 s needs more than 32 GB (it fits in 40 GB); the video keeps its composition and action but is not bit-identical to
 the one made with the memory node. Times are end to end (model loading, text encoding, sampling, decoding) on an H200
-with the PyTorch allocator capped at 24 GiB; a consumer GPU is slower, and sampling time scales linearly with steps.
+with the PyTorch allocator capped at 24 or 14 GiB; a consumer GPU is slower, and sampling time scales linearly with steps.
 
-**16 GB and 22 GB GPUs.** Both workflows also run unchanged with the GPU memory capped at 14 GiB (room for a 16 GB
-card's desktop and CUDA context): ComfyUI's dynamic VRAM then keeps less of the model resident and streams more of it
-from system memory, and the videos are bit-identical to the 24 GiB runs (15 s with the memory node, and 5 s with
-stock nodes only). What grows is system memory: about 46 GiB in use, so 64 GB of RAM is recommended. On the H200 the
-4-step 15 s workflow took 470 s at the 14 GiB cap, and a 4-step 5 s video with stock nodes 126 s. GPUs without native
-bf16 (RTX 20 series and older) run the bf16 math emulated, which is much slower; we have not measured them.
+**16 GB and 22 GB GPUs.** The workflows need no changes: with the GPU memory capped at 14 GiB (room for a 16 GB
+card's desktop and CUDA context) ComfyUI's dynamic VRAM keeps less of the model resident and streams more of it from
+system memory, and the videos are bit-identical to the 24 GiB runs (15 s with the memory node, and 5 s with stock
+nodes only, 126 s for 4 steps). What grows is system memory: about 46 GiB in use, so 64 GB of RAM is recommended.
+GPUs without native bf16 (RTX 20 series and older) run the bf16 math emulated, which is much slower; we have not
+measured them.
 
 ## Workflow (text-to-audio-video)
 
