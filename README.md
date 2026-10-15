@@ -32,6 +32,9 @@ teacher into a 4-step generator of 1344x768 video with native stereo audio.
 
 ## 🗣️ Updates
 
+* **2026/10/15:** The [Wan2.1 training data](https://huggingface.co/datasets/ZhengmingYu/DMAD-Wan-data) (42,158 Wan2.1-14B
+  teacher samples with their real-video latents) is on Hugging Face, so [`train/wan`](train/wan/README.md#data) can start
+  training right away 🤗
 * **2026/10/10:** 8 GB GPUs: [`--low-vram`](#on-consumer-gpus) now makes 5 s videos in under 7 GiB of GPU memory and
   15 s videos in 12 GiB, bit-identical to the larger-GPU runs (`--low-vram 8 / 12 / 16 / 24` picks the settings for
   your GPU, detected by default), and a 5 s [ComfyUI workflow for 8 GB GPUs](comfyui/README.md#8-gb-gpus-5-s) 🪶

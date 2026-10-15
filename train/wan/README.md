@@ -84,12 +84,20 @@ Then score `outputs/vbench_1pt3B` as described in
 
 ## Data
 
+The training data is on Hugging Face: [ZhengmingYu/DMAD-Wan-data](https://huggingface.co/datasets/ZhengmingYu/DMAD-Wan-data)
+(531 GB in 5,270 WebDataset shards; accept the UltraVideo license on the dataset page first). Download it and use the
+folder as `DATA`:
+
+```bash
+hf download ZhengmingYu/DMAD-Wan-data --repo-type dataset --local-dir /path/to/data   # -> /path/to/data/shards/shard_*.tar
+```
+
 Each training row holds:
 * a Wan2.1-14B teacher sample for an UltraVideo caption: 100-step Euler, CFG 5, shift 3, 81 frames, 480p;
 * its T5 embedding and prompt;
 * the latent of the UltraVideo clip that caption describes (`real_latent.pt`).
 
-There are 42,158 rows in total.
+There are 42,158 rows in total. To build the data yourself instead (the teacher sampling is the slow part):
 
 ```bash
 # build the shards: UltraVideo_short.csv + clips_short_960 from huggingface.co/datasets/APRIL-AIGC/UltraVideo
