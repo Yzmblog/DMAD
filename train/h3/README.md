@@ -37,6 +37,31 @@ Inference lives at the repository root: [`inference.py`](../../inference.py) (th
 [main README](../../README.md). A training checkpoint's `ema_lora/pytorch_lora_weights.safetensors` (or the live
 `pytorch_lora_weights.safetensors`) is passed as `--lora`.
 
+### Evaluation
+
+```bash
+hf download ZhengmingYu/DMAD --include "minimax_h3/*_critic.safetensors" --local-dir ckpt
+# AVGen-Bench: the 235 prompts in H3's structured format
+python inference.py --model-dir $H3_MODEL_DIR --lora ckpt/minimax_h3/dmad_minimax_h3_4step_lora_critic.safetensors \
+    --prompt-file train/h3/evaluation/avgenbench/prompts.jsonl --seed 42 --output-dir outputs/avgenbench_235_lora_critic
+
+python inference.py --model-dir $H3_MODEL_DIR --lora ckpt/minimax_h3/dmad_minimax_h3_4step_full_critic.safetensors \
+    --prompt-file train/h3/evaluation/avgenbench/prompts.jsonl --seed 42 --output-dir outputs/avgenbench_235_full_critic
+
+# human preference study: the 387 VideoGen-Eval prompts
+python inference.py --model-dir $H3_MODEL_DIR --lora ckpt/minimax_h3/dmad_minimax_h3_4step_lora_critic.safetensors \
+    --prompt-file train/h3/evaluation/videogen_eval/prompts.jsonl --seed 42 --output-dir outputs/videogen_eval_387_lora_critic
+    
+python inference.py --model-dir $H3_MODEL_DIR --lora ckpt/minimax_h3/dmad_minimax_h3_4step_full_critic.safetensors \
+    --prompt-file train/h3/evaluation/videogen_eval/prompts.jsonl --seed 42 --output-dir outputs/videogen_eval_387_full_critic
+```
+
+Then score the AVGen-Bench videos as described in [evaluation/avgenbench/README.md](evaluation/avgenbench/README.md)
+(prompt rewrite, judge setup). The human preference study (Figure 6 of the paper) used the 387
+text-to-video prompts of [VideoGen-Eval](https://ailab-cvc.github.io/VideoGen-Eval/) in their MiniMax-H3
+prompt-enhanced form, [evaluation/videogen_eval/prompts.jsonl](evaluation/videogen_eval/prompts.jsonl) (ids 730–1116
+in order; output `<i:04d>.mp4` is id 730 + i), with the same settings.
+
 ### Data Preparation
 
 Training uses [UltraVideo](https://huggingface.co/datasets/APRIL-AIGC/UltraVideo) (`short.csv` and the
