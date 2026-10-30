@@ -11,13 +11,17 @@ generated samples. The code is built on [LightX2V](https://github.com/ModelTC/Li
 | ------ | ------ | ----- | ---------- | ----- | ---------------- |
 | [dmad_minimax_h3](configs/dmad_minimax_h3.yaml) | LoRA (the paper) | 4 | 768x1344, 124 frames (5.2 s) + stereo audio | 800 | [`lora_critic`](https://huggingface.co/ZhengmingYu/DMAD) |
 | [dmad_minimax_h3_full_critic](configs/dmad_minimax_h3_full_critic.yaml) | full, blocks 25-49 | 4 | same | 1600 | [`full_critic`](https://huggingface.co/ZhengmingYu/DMAD) |
+| [dmad_minimax_h3_full_critic_8step](configs/dmad_minimax_h3_full_critic_8step.yaml) | full, blocks 25-49 | 8 | same | 800 | [`8step_full_critic`](https://huggingface.co/ZhengmingYu/DMAD) |
 
 `lora_critic` (the checkpoint of the paper) is the EMA (sigma_rel 0.10) of the student LoRA at iteration 800 of the
 first run (`checkpoint-000000800/ema_lora/pytorch_lora_weights.safetensors`). `full_critic` is the live student LoRA
 at iteration 1600 of the second run (`checkpoint-000001600/pytorch_lora_weights.safetensors`), which differs only in
 the critic: instead of a LoRA, `fake.train_type: full` trains the critic's transformer blocks 25-49 (16.2B parameters)
-and `critic_freeze_blocks: 25` freezes its token refiner, embedders and blocks 0-24. Training took about 6.7 hours
-per 100 iterations with the LoRA critic and 5.5 hours with the full critic on 8 x H200.
+and `critic_freeze_blocks: 25` freezes its token refiner, embedders and blocks 0-24. `8step_full_critic` is the EMA
+(sigma_rel 0.10) of the student LoRA at iteration 800 of a third run, the `full_critic` config with
+`dmd.num_inference_steps: 8` (the student's rollouts during training use up to 8 evaluations instead of 4), trained
+from scratch; sample it with `--steps 8`. Training took about 6.7 hours per 100 iterations with the LoRA critic,
+5.5 hours with the full critic and 6.2 hours for the 8-step run on 8 x H200.
 
 ### Environment Setup
 
@@ -47,6 +51,10 @@ python inference.py --model-dir $H3_MODEL_DIR --lora ckpt/minimax_h3/dmad_minima
 
 python inference.py --model-dir $H3_MODEL_DIR --lora ckpt/minimax_h3/dmad_minimax_h3_4step_full_critic.safetensors \
     --prompt-file train/h3/evaluation/avgenbench/prompts.jsonl --seed 42 --output-dir outputs/avgenbench_235_full_critic
+
+# the 8-step student is sampled with 8 steps
+python inference.py --model-dir $H3_MODEL_DIR --lora ckpt/minimax_h3/dmad_minimax_h3_8step_full_critic.safetensors \
+    --prompt-file train/h3/evaluation/avgenbench/prompts.jsonl --seed 42 --steps 8 --output-dir outputs/avgenbench_235_8step_full_critic
 
 # human preference study: the 387 VideoGen-Eval prompts
 python inference.py --model-dir $H3_MODEL_DIR --lora ckpt/minimax_h3/dmad_minimax_h3_4step_lora_critic.safetensors \

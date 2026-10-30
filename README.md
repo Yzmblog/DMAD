@@ -32,6 +32,9 @@ teacher into a 4-step generator of 1344x768 video with native stereo audio.
 
 ## 🗣️ Updates
 
+* **2026/10/29:** New 8-step student [`8step_full_critic`](#dmad-checkpoints) 🚀 Freshly trained for 8-step sampling,
+  it brings a clear step up in audio-video quality over our 4-step students. Ships with a ComfyUI-layout LoRA: drop it into the
+  [8-step workflow](comfyui/README.md#ready-to-run-workflows-24-gb-gpu). Feel free to try it out! 🎛️
 * **2026/10/15:** The [Wan2.1 training data](https://huggingface.co/datasets/ZhengmingYu/DMAD-Wan-data) (42,158 Wan2.1-14B
   teacher samples with their real-video latents) is on Hugging Face, so [`train/wan`](train/wan/README.md#data) can start
   training right away 🤗
@@ -68,7 +71,7 @@ teacher into a 4-step generator of 1344x768 video with native stereo audio.
 
 This repository contains:
 
-* 🪐 Two DMAD student LoRAs (rank 128, 1.4 GB each): `lora_critic` (the checkpoint of the paper) and `full_critic` (a full-critic variant that scores higher on AVGen-Bench)
+* 🪐 Three DMAD student LoRAs (rank 128, 1.4 GB each): `lora_critic` (the checkpoint of the paper), `full_critic` (a full-critic variant that scores higher on AVGen-Bench) and `8step_full_critic` (the full-critic recipe trained for 8-step sampling)
 * ⚡️ [`inference.py`](inference.py): few-step sampling with the re-noise step rule the students were trained with
   (the sampler of all results in the paper), on one 80 GB GPU or, with `--low-vram`, on an 8 GB consumer GPU
 * 🧩 [`run_diffusers_pipeline.py`](run_diffusers_pipeline.py): the students inside the official Diffusers
@@ -130,23 +133,26 @@ hf download ZhengmingYu/DMAD --include "minimax_h3/*_critic.safetensors" --local
 |------|------------|------|
 | `minimax_h3/dmad_minimax_h3_4step_lora_critic.safetensors` | the checkpoint of the paper: EMA of the student at iteration 800 of the main run | 1.4 GB |
 | `minimax_h3/dmad_minimax_h3_4step_full_critic.safetensors` | the student of a run whose critic backbone is fully trained (the paper's run keeps it frozen under a LoRA): iteration 1600, live weights; it scores higher on AVGen-Bench | 1.4 GB |
+| `minimax_h3/dmad_minimax_h3_8step_full_critic.safetensors` | the 8-step student: the `full_critic` recipe trained with 8-step sampling from scratch. Sample it with `--steps 8` | 1.4 GB |
 | `minimax_h3/dmad_minimax_h3_4step_lora_critic_comfyui.safetensors` | `lora_critic` in ComfyUI's MiniMax-H3 key layout (exact conversion) | 2.0 GB |
 | `minimax_h3/dmad_minimax_h3_4step_full_critic_comfyui.safetensors` | `full_critic` in ComfyUI's MiniMax-H3 key layout (exact conversion) | 2.0 GB |
+| `minimax_h3/dmad_minimax_h3_8step_full_critic_comfyui.safetensors` | `8step_full_critic` in ComfyUI's MiniMax-H3 key layout (exact conversion); 8 steps in the scheduler | 2.0 GB |
 
-The first two are rank-128 LoRAs (alpha 128) on the attention projections and the two feed-forward layers of all 50
+The first three are rank-128 LoRAs (alpha 128) on the attention projections and the two feed-forward layers of all 50
 transformer blocks and the 2 token-refiner blocks, in the Diffusers key layout (`<module>.lora.down.weight`,
-`<module>.lora.up.weight`). The safetensors metadata records the rank, alpha and fusion rule.
+`<module>.lora.up.weight`). The safetensors metadata records the rank, alpha, fusion rule and the step count the
+student was trained for.
 
-The `_comfyui` files are the same two LoRAs converted exactly to ComfyUI's MiniMax-H3 key layout, for ComfyUI; sample
-them with ComfyUI's `lcm` sampler and `simple` scheduler (the students' re-noise rule and sigma grid)
-or the equivalent nodes in [`comfyui/ComfyUI-DMAD`](comfyui/ComfyUI-DMAD/).
+The `_comfyui` files are the same LoRAs converted exactly to ComfyUI's MiniMax-H3 key layout, for ComfyUI; sample
+them with ComfyUI's `lcm` sampler and `simple` scheduler (the students' re-noise rule and sigma grid; 4 steps for the
+4-step students, 8 for `8step_full_critic`) or the equivalent nodes in [`comfyui/ComfyUI-DMAD`](comfyui/ComfyUI-DMAD/).
 
 
 ## 🎥 Inference
 
-Everything is text-to-audio-video with 4 steps, time shift 12 for video and 2 for audio, no classifier-free guidance
-(MiniMax-H3 is guidance-distilled). The default output is 1344x768, 124 frames (5.2 s at 24 fps) with 32 kHz stereo
-audio, the setting the students were trained at.
+Everything is text-to-audio-video with 4 steps (8 for the 8-step student), time shift 12 for video and 2 for audio, no
+classifier-free guidance (MiniMax-H3 is guidance-distilled). The default output is 1344x768, 124 frames (5.2 s at
+24 fps) with 32 kHz stereo audio, the setting the students were trained at.
 
 ```bash
 # the prompt of assets/dmad_sweater_seed42.mp4: an anime girl in a "DMAD" sweater making a heart gesture, with a
@@ -163,6 +169,10 @@ python inference.py --model-dir models/MiniMax-H3 --lora ckpt/minimax_h3/dmad_mi
     --prompt-file prompts/dmad_sweater.txt --seed 42 --output-dir outputs/dmad_sweater_full_critic
 python inference.py --model-dir models/MiniMax-H3 --lora ckpt/minimax_h3/dmad_minimax_h3_4step_lora_critic.safetensors \
     --prompt "A polar bear is playing the violin in the snow." --output-dir outputs/polar_bear
+
+# the 8-step student was trained for 8-step sampling: pass --steps 8 (twice the sampling time of the 4-step students)
+python inference.py --model-dir models/MiniMax-H3 --lora ckpt/minimax_h3/dmad_minimax_h3_8step_full_critic.safetensors \
+    --prompt-file prompts/dmad_sweater.txt --seed 42 --steps 8 --output-dir outputs/dmad_sweater_8step
 ```
 
 Prompt `i` is written to `outputs/<dir>/<i:04d>.mp4` (H.264 + AAC) next to its text, and `settings.json` records the
@@ -171,7 +181,7 @@ transformer stage.
 
 | Option | Default | Notes |
 |--------|---------|-------|
-| `--steps` | 4 | model evaluations; 4 is the trained setting, other counts work (see **Steps** below) |
+| `--steps` | 4 | model evaluations; 4 is the trained setting of the 4-step students and 8 that of `8step_full_critic` (pass `--steps 8` for it), other counts work (see **Steps** below) |
 | `--video-shift`, `--audio-shift` | 12, 2 | time shifts of the sigma grid |
 | `--seed` | 42 | one CPU generator draws the video noise, then the audio noise, then the re-noise draws |
 | `--euler` | off | Euler step rule (the official H3 pipeline's) instead of the re-noise rule; the paper's videos use the re-noise rule |
@@ -194,6 +204,8 @@ ones work too. The prompt is encoded verbatim, with no template, as in the offic
 fixed schedule, so `--steps` is free: the sampler walks the same shifted-linear sigma grid with as many evaluations as
 you ask for, and the sampling time scales linearly (9 s per evaluation on an H200 at the default size). On prompts
 with fast motion (martial arts, boxing, a dunk) we see 8 and 12 steps render the fast movements cleaner than 4-step.
+`8step_full_critic` is the `full_critic` recipe trained with 8-step sampling from scratch, i.e. a student made for
+that setting: use it with `--steps 8`.
 
 ### On consumer GPUs
 

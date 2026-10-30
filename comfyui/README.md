@@ -1,6 +1,6 @@
 # ComfyUI
 
-[`ComfyUI-DMAD`](ComfyUI-DMAD/) holds custom nodes that run the DMAD 4-step students of MiniMax-H3 in ComfyUI the way they were trained. ComfyUI's stock
+[`ComfyUI-DMAD`](ComfyUI-DMAD/) holds custom nodes that run the DMAD students of MiniMax-H3 (the 4-step `lora_critic` and `full_critic`, and the 8-step `8step_full_critic`) in ComfyUI the way they were trained. ComfyUI's stock
 `lcm` sampler with the `simple` scheduler (after `ModelSamplingMiniMaxH3`) implements the same rule and sigma grid and
 gives bit-identical videos, so these nodes are a convenience; either works.
 
@@ -10,7 +10,7 @@ gives bit-identical videos, so these nodes are a convenience; either works.
   (euler, ...) step from x_t instead, which is not the students' operating point.
 * **DMAD Sigmas** — the students' sigma grid: shifted linear from 1 to 0, shift 12 (video), `steps` model evaluations.
 
-The ComfyUI-layout LoRAs, [`minimax_h3/dmad_minimax_h3_4step_{lora_critic,full_critic}_comfyui.safetensors`](https://huggingface.co/ZhengmingYu/DMAD/tree/main/minimax_h3)
+The ComfyUI-layout LoRAs, [`minimax_h3/dmad_minimax_h3_{4step_lora_critic,4step_full_critic,8step_full_critic}_comfyui.safetensors`](https://huggingface.co/ZhengmingYu/DMAD/tree/main/minimax_h3)
 on the Hugging Face repo, are exact conversions of the released LoRAs (rank 128; q/k/v fused block-diagonally into
 `qkv_proj`, SwiGLU halves reordered; no merging or rank reduction), made with
 [`tools/convert_lora_comfyui.py`](../tools/convert_lora_comfyui.py).
@@ -23,6 +23,7 @@ Copy or symlink [`ComfyUI-DMAD`](ComfyUI-DMAD/) into `ComfyUI/custom_nodes/` (op
 cp -r comfyui/ComfyUI-DMAD /path/to/ComfyUI/custom_nodes/
 wget -P /path/to/ComfyUI/models/loras https://huggingface.co/ZhengmingYu/DMAD/resolve/main/minimax_h3/dmad_minimax_h3_4step_full_critic_comfyui.safetensors
 wget -P /path/to/ComfyUI/models/loras https://huggingface.co/ZhengmingYu/DMAD/resolve/main/minimax_h3/dmad_minimax_h3_4step_lora_critic_comfyui.safetensors
+wget -P /path/to/ComfyUI/models/loras https://huggingface.co/ZhengmingYu/DMAD/resolve/main/minimax_h3/dmad_minimax_h3_8step_full_critic_comfyui.safetensors
 ```
 
 The base model, text encoder and VAEs are the
@@ -36,7 +37,9 @@ partition; the students were trained on the text-to-audio-video transformer, see
 Complete text-to-audio-video workflows in [`workflows`](workflows/): two that make 15 s of 1344x768 video
 with stereo audio on a 16 GB GPU or larger, and a 5 s one for 8 GB GPUs. Load the `.json`, or drag the example `.mp4` (on the Hugging Face repo; it embeds the
 workflow) into ComfyUI; missing models are offered for download from links stored in the workflow. All sample with
-stock nodes (`lcm` + `simple`, `full_critic` LoRA); the ComfyUI-DMAD nodes are not needed.
+stock nodes (`lcm` + `simple`, `full_critic` LoRA); the ComfyUI-DMAD nodes are not needed. To run the 8-step student
+`8step_full_critic` instead, pick `dmad_minimax_h3_8step_full_critic_comfyui.safetensors` in `LoraLoaderModelOnly` of
+the 8-step workflow (its scheduler is already at 8 steps); everything else stays the same.
 
 | GPU | workflow | video |
 |---|---|---|
@@ -117,15 +120,17 @@ UNETLoader (minimax_h3_fl2va_*.safetensors)
   -> LoraLoaderModelOnly (dmad_minimax_h3_4step_lora_critic_comfyui.safetensors, strength 1.0)
   -> ModelSamplingMiniMaxH3 (shift_video 12.0, shift_audio 2.0)
   -> BasicGuider (conditioning from MiniMax H3 Image to Video / CLIPTextEncode with the minimax CLIP)
-SamplerCustomAdvanced: noise = RandomNoise, guider as above, sampler = DMAD Sampler, sigmas = DMAD Sigmas (steps 4, shift 12)
-                       (or sampler = KSamplerSelect lcm, sigmas = BasicScheduler simple, 4 steps: identical result),
+SamplerCustomAdvanced: noise = RandomNoise, guider as above, sampler = DMAD Sampler, sigmas = DMAD Sigmas (steps 4, shift 12;
+                       steps 8 with dmad_minimax_h3_8step_full_critic_comfyui.safetensors)
+                       (or sampler = KSamplerSelect lcm, sigmas = BasicScheduler simple, same steps: identical result),
                        latent_image = Empty MiniMax H3 AV Latent (1344 x 768, 124 frames)
   -> VAEDecode (video VAE) + VAEDecodeAudio (audio VAE) -> Create Video (24 fps) -> Save Video
 ```
 
 Settings that matter: LoRA strength **1.0** (the LoRA is the distilled student, not a style), **cfg 1.0** (no
 classifier-free guidance; H3 is guidance-distilled), `shift_audio` **2.0** (ComfyUI's H3 default is 3.0; the students
-were trained with 2.0), **4 steps** with the DMAD Sigmas node. The students are trained in continuous time, so the
+were trained with 2.0), **4 steps** with the DMAD Sigmas node for the 4-step students and **8 steps** for
+`8step_full_critic` (trained for 8-step sampling). The students are trained in continuous time, so the
 same sampler also supports more steps (`steps` in DMAD Sigmas; sampling time scales linearly): on prompts with fast
 motion, 8 and 12 steps render the fast movements cleaner than 4-step.
 
