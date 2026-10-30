@@ -1,6 +1,6 @@
 # DMAD: Distribution Matching as Adversarial Distillation for Fast Visual Generation
 
-### 4-step MiniMax-H3 students for joint audio-video generation
+### 4-step & 8-step MiniMax-H3 students for joint audio-video generation
 
 [![Project Page](https://img.shields.io/badge/Project-Page-yellow?logo=googlechrome&logoColor=yellow)](https://yzmblog.github.io/projects/DMAD/)
 [![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv&logoColor=red)](https://arxiv.org/abs/2610.02188)
